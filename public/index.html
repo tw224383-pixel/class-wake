@@ -276,43 +276,58 @@
             btn.innerHTML = '⏳ 処理中...';
             btn.disabled = true;
 
-            const response = await fetch('/api/upload', {
-                method: 'POST',
-                body: formData
-            });
-            const result = await response.json();
+            const file = fileInput.files[0];
+            const reader = new FileReader();
             
-            if (result.success) {
-                rawData = result.data;
-                // 全体の旧クラス集計
-                globalOldClassCounts = {};
-                rawData.forEach(s => {
-                    let oc = String(s['旧クラス'] || s['前年度クラス'] || '').trim();
-                    if (oc) {
-                        globalOldClassCounts[oc] = (globalOldClassCounts[oc] || 0) + 1;
-                    }
-                });
-                
-                // A・B 2つのパターンを生成して比較できるようにする
-                state.patternA = performAutoAssign(rawData, numClasses);
-                state.patternB = performAutoAssign(rawData, numClasses); // ランダム性により異なるパターンに
-                state.currentPattern = 'A';
-                
-                document.getElementById('tabA').classList.add('active');
-                document.getElementById('tabB').classList.remove('active');
-                
-                // ツールバーを表示
-                document.getElementById('toolbar').style.display = 'flex';
-                
-                historyStack = [];
-                updateUndoButton();
-                renderClasses();
-            } else {
-                alert('エラー: ' + result.error);
-            }
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const sheetName = workbook.SheetNames[0];
+                    const sheet = workbook.Sheets[sheetName];
+                    rawData = XLSX.utils.sheet_to_json(sheet);
+                    
+                    // 全体の旧クラス集計
+                    globalOldClassCounts = {};
+                    rawData.forEach(s => {
+                        let oc = String(s['旧クラス'] || s['前年度クラス'] || '').trim();
+                        if (oc) {
+                            globalOldClassCounts[oc] = (globalOldClassCounts[oc] || 0) + 1;
+                        }
+                    });
+                    
+                    // A・B 2つのパターンを生成して比較できるようにする
+                    state.patternA = performAutoAssign(rawData, numClasses);
+                    state.patternB = performAutoAssign(rawData, numClasses);
+                    state.currentPattern = 'A';
+                    
+                    document.getElementById('tabA').classList.add('active');
+                    document.getElementById('tabB').classList.remove('active');
+                    
+                    // ツールバーを表示
+                    document.getElementById('toolbar').style.display = 'flex';
+                    
+                    historyStack = [];
+                    updateUndoButton();
+                    renderClasses();
+                    
+                    btn.innerHTML = origText;
+                    btn.disabled = false;
+                } catch (error) {
+                    console.error(error);
+                    alert('【エラー詳細】\n' + error.name + ': ' + error.message + '\n\nデータ処理エラーです。');
+                    btn.innerHTML = origText;
+                    btn.disabled = false;
+                }
+            };
             
-            btn.innerHTML = origText;
-            btn.disabled = false;
+            reader.onerror = function() {
+                alert('ファイルの読み込みに失敗しました。');
+                btn.innerHTML = origText;
+                btn.disabled = false;
+            };
+            
+            reader.readAsArrayBuffer(file);
         } catch (error) {
             console.error(error);
             alert('【エラー詳細】\n' + error.name + ': ' + error.message + '\n\n通信エラー、またはデータ処理エラーです。');

@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>小学校クラス替え自動編成システム</title>
+    <title>クラス編成アプリ (完全フロントエンド版)</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     <style>
         :root {
             --primary: #4f46e5;
@@ -944,7 +945,7 @@
     });
 
     // エクセルエクスポート
-    document.getElementById('exportBtn').addEventListener('click', async () => {
+    document.getElementById('exportBtn').addEventListener('click', () => {
         const classes = getCurrentClasses();
         if (!classes) {
             alert('エクスポートするデータがありません。');
@@ -957,30 +958,60 @@
             btn.innerHTML = '⏳ 保存中...';
             btn.disabled = true;
 
-            const response = await fetch('/api/export', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ classesData: classes.map(c => ({ students: c })) })
+            const workbook = XLSX.utils.book_new();
+            const allExportData = [];
+            
+            classes.forEach((cls, index) => {
+                const className = `${index + 1}組`;
+                
+                let clsStudents = cls.map(s => {
+                    return {
+                        '決定クラス': className,
+                        '氏名': s.name,
+                        'ふりがな': s.kana,
+                        '性別': s.gender,
+                        '点数': s.score,
+                        '50m/100m走': s.sprintTime || '',
+                        'ピアノ': s.piano ? '〇' : '',
+                        'リーダー': s.leader ? '〇' : '',
+                        '配慮事項': s.notes || '',
+                        '保護者注意': s.warning ? '〇' : '',
+                        '旧クラス': s.oldClass || '',
+                        '同じクラスにしない人': s.ngNames && s.ngNames.length > 0 ? s.ngNames.join(', ') : '',
+                        '同じクラスにする人': s.okNames && s.okNames.length > 0 ? s.okNames.join(', ') : ''
+                    };
+                });
+                
+                allExportData.push(...clsStudents);
+                
+                let byKana = [...clsStudents].sort((a, b) => a['ふりがな'].localeCompare(b['ふりがな'], 'ja'));
+                let wsKana = XLSX.utils.json_to_sheet(byKana);
+                XLSX.utils.book_append_sheet(workbook, wsKana, `${className}(五十音)`);
+                
+                let byGenderKana = [...clsStudents].sort((a, b) => {
+                    let ga = a['性別'] === '男' ? 0 : (a['性別'] === '女' ? 1 : 2);
+                    let gb = b['性別'] === '男' ? 0 : (b['性別'] === '女' ? 1 : 2);
+                    if (ga !== gb) return ga - gb;
+                    return a['ふりがな'].localeCompare(b['ふりがな'], 'ja');
+                });
+                let wsGenderKana = XLSX.utils.json_to_sheet(byGenderKana);
+                XLSX.utils.book_append_sheet(workbook, wsGenderKana, `${className}(男女別)`);
             });
             
-            if (response.ok) {
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'クラス編成結果.xlsx';
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-            } else {
-                alert('エクスポートに失敗しました。');
-            }
+            allExportData.sort((a, b) => {
+                if (a['決定クラス'] !== b['決定クラス']) return a['決定クラス'].localeCompare(b['決定クラス'], 'ja');
+                return a['ふりがな'].localeCompare(b['ふりがな'], 'ja');
+            });
+            const wsAll = XLSX.utils.json_to_sheet(allExportData);
+            XLSX.utils.book_append_sheet(workbook, wsAll, "全体結果");
+            
+            XLSX.writeFile(workbook, 'クラス編成結果.xlsx');
 
             btn.innerHTML = origText;
             btn.disabled = false;
         } catch (error) {
             console.error(error);
-            alert('通信エラーが発生しました。');
+            alert('エクスポート中にエラーが発生しました。');
             document.getElementById('exportBtn').innerHTML = '💾 結果を保存 (Excel)';
             document.getElementById('exportBtn').disabled = false;
         }

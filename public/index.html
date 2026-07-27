@@ -187,6 +187,7 @@
         <button class="btn-secondary" id="swapModeBtn" onclick="toggleSwapMode()" style="background: #f8fafc; border-color: #94a3b8;">🔄 交換モード: OFF</button>
         <button class="btn-secondary" id="sortBtn">📋 五十音順に整列</button>
         <button class="btn-secondary" id="sortGenderBtn">📋 男女別に整列</button>
+        <button class="btn-secondary" id="sortOldClassBtn">📋 旧クラス順</button>
         <button class="btn-secondary" id="compactModeBtn" onclick="toggleCompactMode()">📺 大画面表示</button>
         <button class="btn-secondary" id="undoBtn" disabled>↩️ もとに戻す</button>
         <button class="btn-secondary" id="exportBtn" style="margin-left: auto; border-color: var(--primary); color: var(--primary);">💾 結果を保存 (Excel)</button>
@@ -469,12 +470,17 @@
                 let unitTotalScore = unit.reduce((sum, x) => sum + x.score, 0);
                 penalty += (currentTotalScore + unitTotalScore) * 0.5;
                 
-                // 旧クラス分散 (同じ旧クラスの人が多いとペナルティ)
+                // 旧クラス分散 (理想の最大値を超えるとペナルティ)
                 let oldClassesInClass = classes[i].map(x => x.oldClass).filter(x => x);
                 unit.forEach(s => {
                     if (s.oldClass) {
                         let count = oldClassesInClass.filter(oc => oc === s.oldClass).length;
-                        penalty += count * 200;
+                        let idealMax = Math.ceil((globalOldClassCounts[s.oldClass] || 0) / numClasses);
+                        if (count >= idealMax) {
+                            penalty += 50000; // 理想数を超える配置には超巨大ペナルティ
+                        } else {
+                            penalty += count * 500;
+                        }
                     }
                 });
 
@@ -621,7 +627,7 @@
                         <span class="stat-label">役割・特技</span>
                         <span class="stat-value" style="font-size:0.95rem;">🎹${stats.piano}人 &nbsp; 👑${stats.leader}人</span>
                     </div>
-                    <div class="stat-item" style="${(stats.warning > 0 || oldClassBadges.length > 0) ? 'border-color: #fca5a5; background: #fef2f2;' : ''}">
+                    <div class="stat-item" style="${(stats.warning > 0 || oldClassBadges.length > 0) ? 'border-color: #fca5a5; background: #fef2f2; cursor: pointer;' : ''}" ${stats.warning > 0 ? `onclick="showWarningDetails(${index})"` : ''}>
                         <span class="stat-label" style="${(stats.warning > 0 || oldClassBadges.length > 0) ? 'color: #ef4444;' : ''}">保護者注意・その他</span>
                         <span class="stat-value" style="flex-wrap: wrap;">
                             ${stats.warning > 0 ? `<span class="badge danger">⚠️ ${stats.warning}件</span>` : '<span class="badge ok">なし</span>'}
@@ -747,8 +753,13 @@
             }
             
             let otherNorm = normalizeName(other.name);
+            let targetNorm = normalizeName(targetStudent.name);
             let isOk = normOkNames.includes(otherNorm);
-            let isNg = normNgNames.includes(otherNorm);
+            
+            // 相互NGチェック：targetがotherをNGしているか、またはotherがtargetをNGしているか
+            let otherNormNgNames = (other.ngNames || []).map(normalizeName);
+            let isNg = normNgNames.includes(otherNorm) || otherNormNgNames.includes(targetNorm);
+
             
             const createItem = (isChecked, type) => `
                 <label class="student-select-item">
@@ -804,13 +815,37 @@
             const okChecks = document.querySelectorAll('.modal-ok-check:checked');
             const ngChecks = document.querySelectorAll('.modal-ng-check:checked');
             
-            targetStudent.okNames = Array.from(okChecks).map(c => c.value);
-            targetStudent.ngNames = Array.from(ngChecks).map(c => c.value);
+            const selectedOkNames = Array.from(okChecks).map(c => c.value);
+            const selectedNgNames = Array.from(ngChecks).map(c => c.value);
             
-            // データを更新したので、すべての児童のフラットな配列を取得して再編成する
-            // ※手動でのクラス移動はリセットされ、設定に基づき全体再計算される
+            targetStudent.okNames = selectedOkNames;
+            targetStudent.ngNames = selectedNgNames;
+            
+            // データを更新したので、すべての児童のフラットな配列を取得
             let allStudents = [];
             classes.forEach(cls => allStudents.push(...cls));
+            
+            // 相互NGの同期処理
+            const normalizeName = (name) => String(name || '').replace(/\s+/g, '');
+            const targetNorm = normalizeName(targetStudent.name);
+            const selectedNgNorms = selectedNgNames.map(normalizeName);
+            
+            allStudents.forEach(other => {
+                if (other.id === targetStudent.id) return;
+                let otherNorm = normalizeName(other.name);
+                
+                // otherがモダールでNGに選ばれていれば、other側のngNamesにもtargetを追加
+                if (selectedNgNorms.includes(otherNorm)) {
+                    if (!other.ngNames) other.ngNames = [];
+                    let hasTarget = other.ngNames.some(n => normalizeName(n) === targetNorm);
+                    if (!hasTarget) other.ngNames.push(targetStudent.name);
+                } else {
+                    // 選ばれていなければ、other側のngNamesからtargetを削除
+                    if (other.ngNames) {
+                        other.ngNames = other.ngNames.filter(n => normalizeName(n) !== targetNorm);
+                    }
+                }
+            });
             
             const numClasses = parseInt(document.getElementById('numClasses').value);
             state['pattern' + state.currentPattern] = performAutoAssign(allStudents, numClasses);
@@ -958,6 +993,42 @@
         });
         renderClasses();
     });
+
+    // 旧クラス順に整列
+    document.getElementById('sortOldClassBtn').addEventListener('click', () => {
+        const classes = getCurrentClasses();
+        if (!classes) return;
+        saveHistory();
+        
+        classes.forEach(cls => {
+            cls.sort((a, b) => {
+                let oa = a.oldClass || '';
+                let ob = b.oldClass || '';
+                if (oa !== ob) return oa.localeCompare(ob, 'ja');
+                return (a.kana || a.name).localeCompare(b.kana || b.name, 'ja');
+            });
+        });
+        renderClasses();
+    });
+
+    // 警告詳細表示用関数
+    function showWarningDetails(classIndex) {
+        const classes = getCurrentClasses();
+        if (!classes || !classes[classIndex]) return;
+        
+        const cls = classes[classIndex];
+        const warningStudents = cls.filter(s => s.warning);
+        
+        if (warningStudents.length === 0) return;
+        
+        let details = `【${classIndex + 1}組】保護者注意・配慮事項の詳細\n\n`;
+        warningStudents.forEach(s => {
+            details += `■ ${s.name} (${s.gender})\n`;
+            details += `  内容: ${s.notes || '記載なし'}\n\n`;
+        });
+        
+        alert(details);
+    }
 
     // エクセルエクスポート
     document.getElementById('exportBtn').addEventListener('click', () => {

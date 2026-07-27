@@ -149,7 +149,7 @@
 </div>
 
 <div class="container">
-    <h1>🏫 小学校クラス替え自動編成システム</h1>
+    <h1>🏫 小学校クラス替え自動編成システム <span style="font-size: 0.6em; color: var(--text-light);">(v2.1)</span></h1>
     
     <div class="controls">
         <div class="step">
@@ -337,11 +337,11 @@
         }
     });
 
-    // カンマやスペースで名前を分割するユーティリティ
+    // カンマや改行で名前を分割するユーティリティ (スペースでは分割しない)
     function parseNames(str) {
         if (!str) return [];
         if (Array.isArray(str)) return str;
-        return String(str).split(/[,、\s]+/).map(n => n.trim()).filter(n => n);
+        return String(str).split(/[,、\n]+/).map(n => n.trim()).filter(n => n);
     }
 
     // 自動編成ロジック (制約と分散を考慮)

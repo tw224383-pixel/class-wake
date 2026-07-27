@@ -723,7 +723,9 @@
                 &nbsp;&nbsp; <strong>旧クラス:</strong> ${targetStudent.oldClass || 'なし'}
                 &nbsp;&nbsp; <strong>走力タイム:</strong> ${targetStudent.sprintTime ? targetStudent.sprintTime + '秒' : 'なし'}</div>
                 <div style="margin-bottom: 4px;"><strong>役割・特技:</strong> ${targetStudent.piano ? '🎹ピアノ ' : ''}${targetStudent.leader ? '👑リーダー ' : ''}${(!targetStudent.piano && !targetStudent.leader) ? 'なし' : ''}</div>
-                <div style="color: #ef4444;"><strong>注意・配慮事項:</strong> ${targetStudent.warning ? '⚠️保護者注意 ' : ''}${targetStudent.notes || 'なし'}</div>
+                <div style="color: #ef4444; margin-bottom: 4px;"><strong>注意・配慮事項:</strong> ${targetStudent.warning ? '⚠️保護者注意 ' : ''}${targetStudent.notes || 'なし'}</div>
+                <div style="color: #10b981; font-size: 0.9rem; margin-bottom: 2px;"><strong>⭕ 一緒のクラスにする:</strong> ${(targetStudent.okNames && targetStudent.okNames.length > 0) ? targetStudent.okNames.join(', ') : 'なし'}</div>
+                <div style="color: #ef4444; font-size: 0.9rem;"><strong>❌ 一緒のクラスにしない:</strong> ${(targetStudent.ngNames && targetStudent.ngNames.length > 0) ? targetStudent.ngNames.join(', ') : 'なし'}</div>
             `;
             document.getElementById('modalStudentInfo').innerHTML = infoHtml;
             

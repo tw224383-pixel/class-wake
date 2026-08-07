@@ -149,7 +149,7 @@
 </div>
 
 <div class="container">
-    <h1>🏫 小学校クラス替え自動編成システム <span style="font-size: 0.6em; color: var(--text-light);">(v2.1)</span></h1>
+    <h1>🏫 小学校クラス替え自動編成システム <span style="font-size: 0.6em; color: var(--text-light);">(v2.2)</span></h1>
     
     <div class="controls">
         <div class="step">
@@ -159,7 +159,7 @@
                 <small style="color: var(--text-light); font-size: 0.8rem;">
                     ※列名の例: 氏名, 性別(男/女), 点数, ピアノ, リーダー, 配慮事項, 保護者注意, 旧クラス, 分離ID, 同梱ID
                 </small>
-                <a href="/api/template" download class="btn-secondary" style="text-decoration: none; padding: 4px 10px; font-size: 0.8rem; border-radius: 4px; flex-shrink: 0; box-shadow: 0 1px 2px rgba(0,0,0,0.05); border: 1px solid var(--border); color: var(--text); background: white;">📥 テンプレートDL</a>
+                <button type="button" onclick="downloadTemplate()" class="btn-secondary" style="padding: 4px 10px; font-size: 0.8rem; border-radius: 4px; flex-shrink: 0; box-shadow: 0 1px 2px rgba(0,0,0,0.05); border: 1px solid var(--border); color: var(--text); background: white; cursor: pointer;">📥 テンプレートDL</button>
             </div>
         </div>
         <div class="step" style="flex: 0.5;">
@@ -1030,6 +1030,78 @@
         });
         
         alert(details);
+    }
+
+    // テンプレートダウンロード (完全フロントエンド対応)
+    function downloadTemplate() {
+        const sampleData = [
+            {
+                '氏名': '山田 太郎',
+                'ふりがな': 'やまだ たろう',
+                '性別': '男',
+                '点数': 85,
+                '50m/100m走': 8.2,
+                'ピアノ': '',
+                'リーダー': '〇',
+                '配慮事項': '',
+                '保護者注意': '',
+                '旧クラス': '1組',
+                '同じクラスにしない人': '',
+                '同じクラスにする人': ''
+            },
+            {
+                '氏名': '佐藤 桜',
+                'ふりがな': 'さとう さくら',
+                '性別': '女',
+                '点数': 92,
+                '50m/100m走': 9.1,
+                'ピアノ': '〇',
+                'リーダー': '',
+                '配慮事項': '視力が低いため前方席希望',
+                '保護者注意': '',
+                '旧クラス': '1組',
+                '同じクラスにしない人': '鈴木 陸',
+                '同じクラスにする人': ''
+            },
+            {
+                '氏名': '鈴木 陸',
+                'ふりがな': 'すずき りく',
+                '性別': '男',
+                '点数': 70,
+                '50m/100m走': 7.8,
+                'ピアノ': '',
+                'リーダー': '',
+                '配慮事項': '',
+                '保護者注意': '〇',
+                '旧クラス': '2組',
+                '同じクラスにしない人': '佐藤 桜',
+                '同じクラスにする人': ''
+            },
+            {
+                '氏名': '高橋 結衣',
+                'ふりがな': 'たかはし ゆい',
+                '性別': '女',
+                '点数': 78,
+                '50m/100m走': 8.9,
+                'ピアノ': '',
+                'リーダー': '〇',
+                '配慮事項': '',
+                '保護者注意': '',
+                '旧クラス': '2組',
+                '同じクラスにしない人': '',
+                '同じクラスにする人': ''
+            }
+        ];
+
+        try {
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.json_to_sheet(sampleData);
+            XLSX.utils.book_append_sheet(wb, ws, "生徒名簿テンプレート");
+            XLSX.writeFile(wb, "クラス替え生徒名簿_テンプレート.xlsx");
+        } catch (err) {
+            console.error(err);
+            alert('テンプレートの作成に失敗しました。');
+        }
     }
 
     // エクセルエクスポート
